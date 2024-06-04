@@ -4,31 +4,6 @@ const { decrypt } = require("./encryption");
 
 require("dotenv").config();
 
-(async () => {
-  // Create a client
-  const client = new Pulsar.Client({
-    serviceUrl: "pulsar://localhost:6650",
-  });
-
-  // Create a consumer
-  const consumer = await client.subscribe({
-    topic: "pay",
-    subscription: "my-subscription",
-    subscriptionType: "Exclusive",
-  });
-
-  // Receive messages
-  for (let i = 0; i < 10; i += 1) {
-    const msg = await consumer.receive();
-    console.log(msg.getData().toString());
-    console.log(decrypt(JSON.parse(msg.getData())));
-    consumer.acknowledge(msg);
-  }
-
-  await consumer.close();
-  await client.close();
-})();
-
 const notifyEmail = async (email, message) => {
   try {
     const transporter = nodemailer.createTransport({
@@ -41,7 +16,7 @@ const notifyEmail = async (email, message) => {
       },
     });
 
-    console.log({ user: process.env.email, pass: process.env.password });
+    console.log(email, message);
 
     const mailOptions = {
       from: process.env.email,
@@ -62,3 +37,31 @@ const notifyEmail = async (email, message) => {
     console.log(error);
   }
 };
+
+console.log("Notification service started listening");
+
+(async () => {
+  // Create a client
+  const client = new Pulsar.Client({
+    serviceUrl: process.env.pulsarUrl,
+  });
+
+  // Create a consumer
+  const consumer = await client.subscribe({
+    topic: "pay",
+    subscription: "my-subscription",
+    subscriptionType: "Exclusive",
+  });
+
+  // Receive messages
+  while (true) {
+    const msg = await consumer.receive();
+    const { email, message } = JSON.parse(decrypt(JSON.parse(msg.getData())));
+    console.log("here", typeof data);
+    await notifyEmail(email, message);
+    consumer.acknowledge(msg);
+  }
+
+  await consumer.close();
+  await client.close();
+})();
